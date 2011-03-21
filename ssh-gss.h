@@ -42,6 +42,10 @@
 #   include <gssapi/gssapi_generic.h>
 #  endif
 
+#ifndef HEIMDAL
+#include <gssapi/gssapi_ext.h>
+#endif
+
 /* MIT Kerberos doesn't seem to define GSS_NT_HOSTBASED_SERVICE */
 
 #ifndef GSS_C_NT_HOSTBASED_SERVICE
@@ -71,19 +75,9 @@ typedef struct {
 	gss_buffer_desc displayname;
 	gss_buffer_desc exportedname;
 	gss_cred_id_t creds;
-	struct ssh_gssapi_mech_struct *mech;
+	gss_name_t name;
 	ssh_gssapi_ccache store;
 } ssh_gssapi_client;
-
-typedef struct ssh_gssapi_mech_struct {
-	char *enc_name;
-	char *name;
-	gss_OID_desc oid;
-	int (*dochild) (ssh_gssapi_client *);
-	int (*userok) (ssh_gssapi_client *, char *);
-	int (*localname) (ssh_gssapi_client *, char **);
-	void (*storecreds) (ssh_gssapi_client *);
-} ssh_gssapi_mech;
 
 typedef struct {
 	OM_uint32	major; /* both */
@@ -96,13 +90,10 @@ typedef struct {
 	gss_cred_id_t	client_creds; /* server */
 } Gssctxt;
 
-extern ssh_gssapi_mech *supported_mechs[];
-
 int  ssh_gssapi_check_oid(Gssctxt *, void *, size_t);
 void ssh_gssapi_set_oid_data(Gssctxt *, void *, size_t);
 void ssh_gssapi_set_oid(Gssctxt *, gss_OID);
 void ssh_gssapi_supported_oids(gss_OID_set *);
-ssh_gssapi_mech *ssh_gssapi_get_ctype(Gssctxt *);
 
 OM_uint32 ssh_gssapi_import_name(Gssctxt *, const char *);
 OM_uint32 ssh_gssapi_init_ctx(Gssctxt *, int,
