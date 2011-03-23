@@ -1,7 +1,7 @@
 /* $OpenBSD: gss-serv.c,v 1.22 2008/05/08 12:02:23 djm Exp $ */
 
 /*
- * Copyright (c) 2001-2003 Simon Wilkinson. All rights reserved.
+ * Copyright (c) 2001-2009 Simon Wilkinson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,8 +45,13 @@
 #include "channels.h"
 #include "session.h"
 #include "misc.h"
+#include "servconf.h"
+#include "uidswap.h"
 
 #include "ssh-gss.h"
+#include "monitor_wrap.h"
+
+extern ServerOptions options;
 
 static ssh_gssapi_client gssapi_client =
     { GSS_C_EMPTY_BUFFER, GSS_C_EMPTY_BUFFER,
@@ -66,25 +71,32 @@ ssh_gssapi_acquire_cred(Gssctxt *ctx)
 	char lname[MAXHOSTNAMELEN];
 	gss_OID_set oidset;
 
-	gss_create_empty_oid_set(&status, &oidset);
-	gss_add_oid_set_member(&status, ctx->oid, &oidset);
+	if (options.gss_strict_acceptor) {
+		gss_create_empty_oid_set(&status, &oidset);
+		gss_add_oid_set_member(&status, ctx->oid, &oidset);
 
-	if (gethostname(lname, MAXHOSTNAMELEN)) {
-		gss_release_oid_set(&status, &oidset);
-		return (-1);
-	}
+		if (gethostname(lname, MAXHOSTNAMELEN)) {
+			gss_release_oid_set(&status, &oidset);
+			return (-1);
+		}
 
-	if (GSS_ERROR(ssh_gssapi_import_name(ctx, lname))) {
+		if (GSS_ERROR(ssh_gssapi_import_name(ctx, lname))) {
+			gss_release_oid_set(&status, &oidset);
+			return (ctx->major);
+		}
+
+		if ((ctx->major = gss_acquire_cred(&ctx->minor,
+		    ctx->name, 0, oidset, GSS_C_ACCEPT, &ctx->creds, 
+		    NULL, NULL)))
+			ssh_gssapi_error(ctx);
+
 		gss_release_oid_set(&status, &oidset);
 		return (ctx->major);
+	} else {
+		ctx->name = GSS_C_NO_NAME;
+		ctx->creds = GSS_C_NO_CREDENTIAL;
 	}
-
-	if ((ctx->major = gss_acquire_cred(&ctx->minor,
-	    ctx->name, 0, oidset, GSS_C_ACCEPT, &ctx->creds, NULL, NULL)))
-		ssh_gssapi_error(ctx);
-
-	gss_release_oid_set(&status, &oidset);
-	return (ctx->major);
+	return GSS_S_COMPLETE;
 }
 
 /* Privileged */
@@ -96,6 +108,29 @@ ssh_gssapi_server_ctx(Gssctxt **ctx, gss_OID oid)
 	ssh_gssapi_build_ctx(ctx);
 	ssh_gssapi_set_oid(*ctx, oid);
 	return (ssh_gssapi_acquire_cred(*ctx));
+}
+
+/* Unprivileged */
+char *
+ssh_gssapi_server_mechanisms() {
+	gss_OID_set	supported;
+
+	ssh_gssapi_supported_oids(&supported);
+	return (ssh_gssapi_kex_mechs(supported, &ssh_gssapi_server_check_mech,
+	    NULL, NULL));
+}
+
+/* Unprivileged */
+int
+ssh_gssapi_server_check_mech(Gssctxt **dum, gss_OID oid, const char *data,
+    const char *dummy) {
+	Gssctxt *ctx = NULL;
+	int res;
+ 
+	res = !GSS_ERROR(PRIVSEP(ssh_gssapi_server_ctx(&ctx, oid)));
+	ssh_gssapi_delete_ctx(&ctx);
+
+	return (res);
 }
 
 /* Unprivileged */
@@ -240,6 +275,8 @@ ssh_gssapi_getclient(Gssctxt *ctx, ssh_gssapi_client *client)
 		return (ctx->major);
 	}
 
+	gss_release_buffer(&ctx->minor, &ename);
+
 	/* We can't copy this structure, so we just move the pointer to it */
 	client->creds = ctx->client_creds;
 	ctx->client_creds = GSS_C_NO_CREDENTIAL;
@@ -288,7 +325,7 @@ ssh_gssapi_do_child(char ***envp, u_int *envsizep)
 
 /* Privileged */
 int
-ssh_gssapi_userok(char *user)
+ssh_gssapi_userok(char *user, struct passwd *pw)
 {
 	OM_uint32 lmin;
 	int userok = 0;
@@ -309,17 +346,12 @@ ssh_gssapi_userok(char *user)
 		return 0;
 	}
 
+	if (userok) {
+		gssapi_client.used = 1;
+		gssapi_client.store.owner = pw;
+	}
+
 	return (userok);
-}
-
-/* Privileged */
-OM_uint32
-ssh_gssapi_checkmic(Gssctxt *ctx, gss_buffer_t gssbuf, gss_buffer_t gssmic)
-{
-	ctx->major = gss_verify_mic(&ctx->minor, ctx->context,
-	    gssbuf, gssmic, NULL);
-
-	return (ctx->major);
 }
 
 #endif
