@@ -335,8 +335,7 @@ ssh_gssapi_userok(char *user, struct passwd *pw)
 		debug("No suitable client data");
 		return 0;
 	}
-	if (GSS_ERROR(gss_userok(&lmin, gssapi_client.name, user, &userok)) ||
-	    userok == 0) {
+	if (!gss_userok(gssapi_client.name, user)) {
 		/* Destroy delegated credentials if userok fails */
 		gss_release_buffer(&lmin, &gssapi_client.displayname);
 		gss_release_buffer(&lmin, &gssapi_client.exportedname);
