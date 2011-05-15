@@ -335,19 +335,18 @@ ssh_gssapi_userok(char *user, struct passwd *pw)
 		debug("No suitable client data");
 		return 0;
 	}
-	if (!gss_userok(gssapi_client.name, user)) {
+
+	userok = gss_userok(gssapi_client.name, user);
+	if (userok) {
+		gssapi_client.used = 1;
+		gssapi_client.store.owner = pw;
+	} else {
 		/* Destroy delegated credentials if userok fails */
 		gss_release_buffer(&lmin, &gssapi_client.displayname);
 		gss_release_buffer(&lmin, &gssapi_client.exportedname);
 		gss_release_name(&lmin, &gssapi_client.name);
 		gss_release_cred(&lmin, &gssapi_client.creds);
 		memset(&gssapi_client, 0, sizeof(ssh_gssapi_client));
-		return 0;
-	}
-
-	if (userok) {
-		gssapi_client.used = 1;
-		gssapi_client.store.owner = pw;
 	}
 
 	return (userok);
