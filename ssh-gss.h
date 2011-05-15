@@ -124,6 +124,7 @@ int ssh_gssapi_server_check_mech(Gssctxt **,gss_OID, const char *,
     const char *);
 OM_uint32 ssh_gssapi_server_ctx(Gssctxt **, gss_OID);
 int ssh_gssapi_userok(char *name, struct passwd *);
+OM_uint32 ssh_gssapi_localname(char **name);
 OM_uint32 ssh_gssapi_checkmic(Gssctxt *, gss_buffer_t, gss_buffer_t);
 void ssh_gssapi_do_child(char ***, u_int *);
 void ssh_gssapi_cleanup_creds(void);

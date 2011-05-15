@@ -1272,6 +1272,31 @@ mm_ssh_gssapi_sign(Gssctxt *ctx, gss_buffer_desc *data, gss_buffer_desc *hash)
 	return(major);
 }
 
+OM_uint32
+mm_ssh_gssapi_localname(char **lname)
+{
+	Buffer m;
+	OM_uint32 major;
+
+	buffer_init(&m);
+	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_GSSLOCALNAME, &m);
+
+	debug3("%s: waiting for MONITOR_ANS_GSSLOCALNAME", __func__);
+	mm_request_receive_expect(pmonitor->m_recvfd, MONITOR_ANS_GSSLOCALNAME, &m);
+
+	major = buffer_get_int(&m);
+	*lname = buffer_get_string(&m, NULL);
+
+	if (GSS_ERROR(major)) {
+		debug3("%s: gssapi identity mapping failed", __func__);
+	} else {
+		debug3("%s: gssapi identity mapped to %s", __func__, *lname);
+	}
+
+	buffer_free(&m);
+
+	return(major);
+}
 #endif /* GSSAPI */
 
 #ifdef JPAKE

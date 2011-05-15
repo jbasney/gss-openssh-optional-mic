@@ -232,11 +232,32 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 	if ((style = strchr(user, ':')) != NULL)
 		*style++ = 0;
 
-	if (authctxt->attempt++ == 0) {
-		/* setup auth context */
+	/* If first time or username changed or empty username,
+	   setup/reset authentication context. */
+	if ((authctxt->attempt++ == 0) ||
+	    (strcmp(user, authctxt->user) != 0) ||
+	    (strcmp(user, "") == 0)) {
+		if (authctxt->user) {
+		    xfree(authctxt->user);
+		    authctxt->user = NULL;
+		}
+		authctxt->valid = 0;
+        authctxt->user = xstrdup(user);
+        if (strcmp(service, "ssh-connection") != 0) {
+            packet_disconnect("Unsupported service %s", service);
+        }
+#ifdef GSSAPI
+		/* If we're going to set the username based on the
+		   GSSAPI context later, then wait until then to
+		   verify it. Just put in placeholders for now. */
+		if ((strcmp(user, "") == 0) &&
+		    (strcmp(method, "gssapi-with-mic") == 0 ||
+		     strcmp(method, "gssapi-keyex") == 0)) {
+			authctxt->pw = fakepw();
+		} else {
+#endif
 		authctxt->pw = PRIVSEP(getpwnamallow(user));
-		authctxt->user = xstrdup(user);
-		if (authctxt->pw && strcmp(service, "ssh-connection")==0) {
+		if (authctxt->pw) {
 			authctxt->valid = 1;
 			debug2("input_userauth_request: setting up authctxt for %s", user);
 		} else {
@@ -250,15 +271,20 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 		if (options.use_pam)
 			PRIVSEP(start_pam(authctxt));
 #endif
+#ifdef GSSAPI
+		} /* endif for setting username based on GSSAPI context */
+#endif
 		setproctitle("%s%s", authctxt->valid ? user : "unknown",
 		    use_privsep ? " [net]" : "");
-		authctxt->service = xstrdup(service);
-		authctxt->style = style ? xstrdup(style) : NULL;
-		if (use_privsep)
-			mm_inform_authserv(service, style);
-		userauth_banner();
-	} else if (strcmp(user, authctxt->user) != 0 ||
-	    strcmp(service, authctxt->service) != 0) {
+                if (authctxt->attempt == 1) {
+			authctxt->service = xstrdup(service);
+			authctxt->style = style ? xstrdup(style) : NULL;
+			if (use_privsep)
+				mm_inform_authserv(service, style);
+			userauth_banner();
+		}
+	}
+	if (strcmp(service, authctxt->service) != 0) {
 		packet_disconnect("Change of username or service not allowed: "
 		    "(%s,%s) -> (%s,%s)",
 		    authctxt->user, authctxt->service, user, service);

@@ -171,6 +171,7 @@ int mm_answer_pam_free_ctx(int, Buffer *);
 int mm_answer_gss_setup_ctx(int, Buffer *);
 int mm_answer_gss_accept_ctx(int, Buffer *);
 int mm_answer_gss_userok(int, Buffer *);
+int mm_answer_gss_localname(int, Buffer *);
 int mm_answer_gss_checkmic(int, Buffer *);
 int mm_answer_gss_sign(int, Buffer *);
 #endif
@@ -212,12 +213,12 @@ struct mon_table {
 struct mon_table mon_dispatch_proto20[] = {
     {MONITOR_REQ_MODULI, MON_ONCE, mm_answer_moduli},
     {MONITOR_REQ_SIGN, MON_ONCE, mm_answer_sign},
-    {MONITOR_REQ_PWNAM, MON_ONCE, mm_answer_pwnamallow},
+    {MONITOR_REQ_PWNAM, MON_AUTH, mm_answer_pwnamallow},
     {MONITOR_REQ_AUTHSERV, MON_ONCE, mm_answer_authserv},
     {MONITOR_REQ_AUTH2_READ_BANNER, MON_ONCE, mm_answer_auth2_read_banner},
     {MONITOR_REQ_AUTHPASSWORD, MON_AUTH, mm_answer_authpassword},
 #ifdef USE_PAM
-    {MONITOR_REQ_PAM_START, MON_ONCE, mm_answer_pam_start},
+    {MONITOR_REQ_PAM_START, MON_ISAUTH, mm_answer_pam_start},
     {MONITOR_REQ_PAM_ACCOUNT, 0, mm_answer_pam_account},
     {MONITOR_REQ_PAM_INIT_CTX, MON_ISAUTH, mm_answer_pam_init_ctx},
     {MONITOR_REQ_PAM_QUERY, MON_ISAUTH, mm_answer_pam_query},
@@ -241,6 +242,7 @@ struct mon_table mon_dispatch_proto20[] = {
     {MONITOR_REQ_GSSSETUP, MON_ISAUTH, mm_answer_gss_setup_ctx},
     {MONITOR_REQ_GSSSTEP, MON_ISAUTH, mm_answer_gss_accept_ctx},
     {MONITOR_REQ_GSSUSEROK, MON_AUTH, mm_answer_gss_userok},
+    {MONITOR_REQ_GSSLOCALNAME, MON_ISAUTH, mm_answer_gss_localname},
     {MONITOR_REQ_GSSCHECKMIC, MON_ISAUTH, mm_answer_gss_checkmic},
     {MONITOR_REQ_GSSSIGN, MON_ONCE, mm_answer_gss_sign},
 #endif
@@ -650,13 +652,11 @@ mm_answer_pwnamallow(int sock, Buffer *m)
 
 	debug3("%s", __func__);
 
-	if (authctxt->attempt++ != 0)
-		fatal("%s: multiple attempts for getpwnam", __func__);
-
 	username = buffer_get_string(m, NULL);
 
 	pwent = getpwnamallow(username);
 
+	if (authctxt->user) xfree(authctxt->user);
 	authctxt->user = xstrdup(username);
 	setproctitle("%s [priv]", pwent ? username : "unknown");
 	xfree(username);
@@ -2027,6 +2027,27 @@ mm_answer_gss_userok(int sock, Buffer *m)
 
 	/* Monitor loop will terminate if authenticated */
 	return (authenticated);
+}
+
+int
+mm_answer_gss_localname(int socket, Buffer *m) {
+	char *name;
+
+	ssh_gssapi_localname(&name);
+
+    buffer_clear(m);
+	if (name) {
+	    buffer_put_cstring(m, name);
+	    debug3("%s: sending result %s", __func__, name);
+	    xfree(name);
+	} else {
+	    buffer_put_cstring(m, "");
+	    debug3("%s: sending result \"\"", __func__);
+	}
+
+    mm_request_send(socket, MONITOR_ANS_GSSLOCALNAME, m);
+
+    return(0);
 }
 
 int 

@@ -102,7 +102,10 @@ userauth_gssapi(Authctxt *authctxt)
 	u_int len;
 	u_char *doid = NULL;
 
-	if (!authctxt->valid || authctxt->user == NULL)
+	/* authctxt->valid may be 0 if we haven't yet determined
+	   username from gssapi context. */
+
+	if (authctxt->user == NULL)
 		return (0);
 
 	mechs = packet_get_int();
@@ -253,6 +256,32 @@ input_gssapi_errtok(int type, u_int32_t plen, void *ctxt)
 	gss_release_buffer(&maj_status, &send_tok);
 }
 
+static void
+gssapi_set_username(Authctxt *authctxt)
+{
+    char *lname = NULL;
+
+    if ((authctxt->user == NULL) || (authctxt->user[0] == '\0')) {
+        PRIVSEP(ssh_gssapi_localname(&lname));
+        if (lname && lname[0] != '\0') {
+            if (authctxt->user) xfree(authctxt->user);
+            authctxt->user = lname;
+            debug("set username to %s from gssapi context", lname);
+            authctxt->pw = PRIVSEP(getpwnamallow(authctxt->user));
+            if (authctxt->pw) {
+                authctxt->valid = 1;
+#ifdef USE_PAM
+                if (options.use_pam)
+                    PRIVSEP(start_pam(authctxt));
+#endif
+            }
+        } else {
+            debug("failed to set username from gssapi context");
+            packet_send_debug("failed to set username from gssapi context");
+        }
+    }
+}
+
 /*
  * This is called when the client thinks we've completed authentication.
  * It should only be enabled in the dispatch handler by the function above,
@@ -312,6 +341,8 @@ input_gssapi_mic(int type, u_int32_t plen, void *ctxt)
 
 	gssbuf.value = buffer_ptr(&b);
 	gssbuf.length = buffer_len(&b);
+
+	gssapi_set_username(authctxt);
 
 	if (!GSS_ERROR(PRIVSEP(ssh_gssapi_checkmic(gssctxt, &gssbuf, &mic))))
 		authenticated = 

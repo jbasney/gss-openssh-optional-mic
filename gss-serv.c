@@ -353,4 +353,25 @@ ssh_gssapi_userok(char *user, struct passwd *pw)
 	return (userok);
 }
 
-#endif
+/* Priviledged */
+OM_uint32
+ssh_gssapi_localname(char **user)
+{
+	OM_uint32 major_status, lmin;
+	uid_t uid;
+	struct passwd *pw;
+
+	major_status = gss_pname_to_uid(&lmin, gssapi_client.name,
+					GSS_C_NO_OID, &uid);
+	if (GSS_ERROR(major_status))
+		return (major_status);
+
+	pw = getpwuid(uid);
+	if (pw == NULL)
+		return (GSS_S_BAD_NAME);
+
+	*user = xstrdup(pw->pw_name);
+
+	return (GSS_S_COMPLETE);
+}
+#endif /* GSSAPI */
