@@ -51,6 +51,7 @@ static void input_gssapi_token(int type, u_int32_t plen, void *ctxt);
 static void input_gssapi_mic(int type, u_int32_t plen, void *ctxt);
 static void input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt);
 static void input_gssapi_errtok(int, u_int32_t, void *);
+static void gssapi_set_username(Authctxt *authctxt);
 
 /* 
  * The 'gssapi_keyex' userauth mechanism.
@@ -73,6 +74,8 @@ userauth_gsskeyex(Authctxt *authctxt)
 
 	gssbuf.value = buffer_ptr(&b);
 	gssbuf.length = buffer_len(&b);
+
+	gssapi_set_username(authctxt);
 
 	/* gss_kex_context is NULL with privsep, so we can't check it here */
 	if (!GSS_ERROR(PRIVSEP(ssh_gssapi_checkmic(gss_kex_context, 
