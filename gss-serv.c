@@ -166,7 +166,7 @@ ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_desc *recv_tok,
 
 	if (ctx->client_creds)
 		debug("Received some client credentials");
-	else
+	else if (ctx->major == GSS_S_COMPLETE)
 		debug("Got no client credentials");
 
 	status = ctx->major;
