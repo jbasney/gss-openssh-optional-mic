@@ -171,12 +171,11 @@ ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_desc *recv_tok,
 
 	status = ctx->major;
 
-	/* Now, if we're complete and we have the right flags, then
+	/* Now, if we're complete, then
 	 * we flag the user as also having been authenticated
 	 */
 
-	if (((flags == NULL) || ((*flags & GSS_C_MUTUAL_FLAG) &&
-	    (*flags & GSS_C_INTEG_FLAG))) && (ctx->major == GSS_S_COMPLETE)) {
+	if (ctx->major == GSS_S_COMPLETE) {
 		if (ssh_gssapi_getclient(ctx, &gssapi_client))
 			fatal("Couldn't convert client name");
 	}
