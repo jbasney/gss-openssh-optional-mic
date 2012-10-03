@@ -432,6 +432,13 @@ Note that this option applies to protocol version 2 only.
 .It Cm GSSAPICleanupCredentials
 Specifies whether to automatically destroy the user's credentials cache
 on logout.
+.It Cm GSSAPIRequireMIC
+Specifies whether to permit authentication using GSS-API mechanisms
+and/or contexts that do not support per-message integrity protection.
+If 
+.Dq yes
+then the server will fail an otherwise valid gssapi-with-mic authentication
+if per-message integrity protection is not supported.
 The default is
 .Dq yes .
 Note that this option applies to protocol version 2 only.

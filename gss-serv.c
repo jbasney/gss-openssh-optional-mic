@@ -171,13 +171,17 @@ ssh_gssapi_accept_ctx(Gssctxt *ctx, gss_buffer_desc *recv_tok,
 
 	status = ctx->major;
 
-	/* Now, if we're complete, then
+	/* Now, if we're complete and we have the right flags, then
 	 * we flag the user as also having been authenticated
 	 */
 
 	if (ctx->major == GSS_S_COMPLETE) {
-		if (ssh_gssapi_getclient(ctx, &gssapi_client))
+		if (options.gss_require_mic &&
+		    ((flags == NULL) || !(*flags & GSS_C_INTEG_FLAG))) {
+			debug("GSSAPIRequireMIC true and integrity protection not supported so gssapi-with-mic fails.");
+		} else if (ssh_gssapi_getclient(ctx, &gssapi_client)) {
 			fatal("Couldn't convert client name");
+		}
 	}
 
 	return (status);

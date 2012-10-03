@@ -98,6 +98,7 @@ initialize_server_options(ServerOptions *options)
 	options->kerberos_get_afs_token = -1;
 	options->gss_authentication=-1;
 	options->gss_keyex = -1;
+	options->gss_require_mic = -1;
 	options->gss_cleanup_creds = -1;
 	options->gss_strict_acceptor = -1;
 	options->password_authentication = -1;
@@ -230,6 +231,8 @@ fill_default_server_options(ServerOptions *options)
 		options->gss_authentication = 0;
 	if (options->gss_keyex == -1)
 		options->gss_keyex = 0;
+	if (options->gss_require_mic == -1)
+		options->gss_require_mic = 1;
 	if (options->gss_cleanup_creds == -1)
 		options->gss_cleanup_creds = 1;
 	if (options->gss_strict_acceptor == -1)
@@ -329,7 +332,7 @@ typedef enum {
 	sHostbasedUsesNameFromPacketOnly, sClientAliveInterval,
 	sClientAliveCountMax, sAuthorizedKeysFile, sAuthorizedKeysFile2,
 	sGssAuthentication, sGssCleanupCreds, sGssStrictAcceptor,
-	sGssKeyEx,
+	sGssKeyEx, sGssReqMIC,
 	sAcceptEnv, sPermitTunnel,
 	sMatch, sPermitOpen, sForceCommand, sChrootDirectory,
 	sUsePrivilegeSeparation, sAllowAgentForwarding,
@@ -397,12 +400,14 @@ static struct {
 	{ "gssapicleanupcreds", sGssCleanupCreds, SSHCFG_GLOBAL },
 	{ "gssapistrictacceptorcheck", sGssStrictAcceptor, SSHCFG_GLOBAL },
 	{ "gssapikeyexchange", sGssKeyEx, SSHCFG_GLOBAL },
+	{ "gssapirequiremic", sGssReqMIC, SSHCFG_GLOBAL },
 #else
 	{ "gssapiauthentication", sUnsupported, SSHCFG_ALL },
 	{ "gssapicleanupcredentials", sUnsupported, SSHCFG_GLOBAL },
 	{ "gssapicleanupcreds", sUnsupported, SSHCFG_GLOBAL },
 	{ "gssapistrictacceptorcheck", sUnsupported, SSHCFG_GLOBAL },
 	{ "gssapikeyexchange", sUnsupported, SSHCFG_GLOBAL },
+	{ "gssapirequiremic", sUnsupported, SSHCFG_GLOBAL },
 #endif
 	{ "gssusesessionccache", sUnsupported, SSHCFG_GLOBAL },
 	{ "gssapiusesessioncredcache", sUnsupported, SSHCFG_GLOBAL },
@@ -962,6 +967,10 @@ process_server_config_line(ServerOptions *options, char *line,
 
 	case sGssKeyEx:
 		intptr = &options->gss_keyex;
+		goto parse_flag;
+
+	case sGssReqMIC:
+		intptr = &options->gss_require_mic;
 		goto parse_flag;
 
 	case sGssCleanupCreds:
@@ -1729,6 +1738,7 @@ dump_config(ServerOptions *o)
 #ifdef GSSAPI
 	dump_cfg_fmtint(sGssAuthentication, o->gss_authentication);
 	dump_cfg_fmtint(sGssKeyEx, o->gss_keyex);
+	dump_cfg_fmtint(sGssReqMIC, o->gss_require_mic);
 	dump_cfg_fmtint(sGssCleanupCreds, o->gss_cleanup_creds);
 	dump_cfg_fmtint(sGssStrictAcceptor, o->gss_strict_acceptor);
 #endif

@@ -98,6 +98,7 @@ typedef struct {
 						 * authenticated with Kerberos. */
 	int     gss_authentication;	/* If true, permit GSSAPI authentication */
 	int     gss_keyex;		/* If true, permit GSSAPI key exchange */
+	int     gss_require_mic;	/* If true, require GSS_C_INTEG_FLAG for gssapi-with-mic */
 	int     gss_cleanup_creds;	/* If true, destroy cred cache on logout */
 	int 	gss_strict_acceptor;	/* If true, restrict the GSSAPI acceptor name */
 	int     password_authentication;	/* If true, permit password
